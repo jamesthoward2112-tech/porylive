@@ -28,7 +28,7 @@ jobs:
       - name: Install official Ubuntu dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi git libpng-dev python3
+          sudo apt-get install -y --no-install-recommends binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi libpng-dev python3
 
       - name: Verify pinned source
         run: |
@@ -40,14 +40,14 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          make -C build1 -j2 2>&1 | tee build1.log
+          make -C build1 -j$(nproc) -O all 2>&1 | tee build1.log
           sha256sum build1/pokeemerald.gba | tee build1.sha256
 
       - name: Clean build 2
         shell: bash
         run: |
           set -o pipefail
-          make -C build2 -j2 2>&1 | tee build2.log
+          make -C build2 -j$(nproc) -O all 2>&1 | tee build2.log
           sha256sum build2/pokeemerald.gba | tee build2.sha256
 
       - name: Compare ROM hashes
