@@ -1,0 +1,78 @@
+name: PHR H002 frozen baseline proof
+
+on:
+  push:
+    branches:
+      - phr-h002-ci
+  workflow_dispatch:
+
+jobs:
+  clean-build-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout build 1
+        uses: actions/checkout@v4
+        with:
+          repository: rh-hideout/pokeemerald-expansion
+          ref: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+          path: build1
+
+      - name: Checkout build 2
+        uses: actions/checkout@v4
+        with:
+          repository: rh-hideout/pokeemerald-expansion
+          ref: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7
+          path: build2
+
+      - name: Install official Ubuntu dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential binutils-arm-none-eabi gcc-arm-none-eabi libnewlib-arm-none-eabi git libpng-dev python3
+
+      - name: Verify pinned source
+        run: |
+          set -e
+          test "$(git -C build1 rev-parse HEAD)" = "e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7"
+          test "$(git -C build2 rev-parse HEAD)" = "e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7"
+
+      - name: Clean build 1
+        shell: bash
+        run: |
+          set -o pipefail
+          make -C build1 -j2 2>&1 | tee build1.log
+          sha256sum build1/pokeemerald.gba | tee build1.sha256
+
+      - name: Clean build 2
+        shell: bash
+        run: |
+          set -o pipefail
+          make -C build2 -j2 2>&1 | tee build2.log
+          sha256sum build2/pokeemerald.gba | tee build2.sha256
+
+      - name: Compare ROM hashes
+        shell: bash
+        run: |
+          set -e
+          H1="$(cut -d' ' -f1 build1.sha256)"
+          H2="$(cut -d' ' -f1 build2.sha256)"
+          {
+            echo "PHR H002 frozen baseline build proof"
+            echo "Source commit: e8bd1cd7b03fc032ea37e3ecd38b379b5d01a1e7"
+            echo "Build 1 SHA-256: $H1"
+            echo "Build 2 SHA-256: $H2"
+          } | tee H002_BUILD_REPORT.txt
+          test "$H1" = "$H2"
+          echo "Result: PASS — both clean builds are byte-identical." | tee -a H002_BUILD_REPORT.txt
+
+      - name: Upload logs and proof only
+        uses: actions/upload-artifact@v4
+        with:
+          name: PHR-H002-build-proof
+          path: |
+            H002_BUILD_REPORT.txt
+            build1.sha256
+            build2.sha256
+            build1.log
+            build2.log
+          if-no-files-found: error
